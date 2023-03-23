@@ -1,56 +1,74 @@
+{-
+Project: FLP 2023 Haskell Project
+File: flp22-fun.hs
+Author: Vojtech Fiala <xfiala61>
+-}
+
 import qualified Types
+import qualified ParseStructures as PS
+import qualified System.IO as I
 import qualified System.Environment as E
 import qualified System.Exit as Exit
 import qualified Text.Parsec as P
-import qualified Text.Parsec.String as Str
 
-testParse :: String -> Either P.ParseError Types.Point
-testParse input = P.parse parsePoint "" input
+testParse :: String -> Either P.ParseError Types.Curve
+testParse input = P.parse PS.parseCurve "" input
 
+-- function to get the `b` from Right b
+rightPart :: Either a b -> b
+rightPart (Right b) = b
+rightPart (Left _) = error "There was an error in parsing the input!"
+
+-- function to print Help
+printHelp :: IO ()
+printHelp = do
+    putStrLn "flp22-fun - ECDSA\n*****************"
+    putStrLn "  - This program requires 1 user parameter and reads input from stdin."
+    putStrLn "  - Additional second argument may be used to refer to file from which the content will be read instead of stdin"
+    putStrLn "  - Valid parameters (of which only 1 must be used at the time) are [-i|-k|-s|-v|-h] where:"
+    putStrLn "      -i loads the input into the data structure and prints it out"
+    putStrLn "      -k loads the input and prints out the generated key pair"
+    putStrLn "      -s loads the input with a private key and a hash and prints out the generated signature"
+    putStrLn "      -v loads the input with a public key and a hash and checks if it matches the signature"
+    putStrLn "      -h prints this menu"
+
+-- function to do get the appropriate output depending on the given argument
+actOnParameter :: [String] -> String -> IO ()
+actOnParameter args input
+    | arg == "-i" = print (rightPart(P.parse PS.parseCurve "" input)) -- call the instance of Show of the Curve class and output it
+    | arg == "-k" =  putStrLn "-k"
+    | arg == "-s" =  putStrLn "-s"
+    | arg == "-v" = putStrLn "-v"
+    | arg == "-h" = printHelp
+    | otherwise = do
+        printHelp
+        putStrLn "\nUnknown parameter!"
+        Exit.exitWith (Exit.ExitFailure 1)
+    where arg = head args
+
+-- function to parse the arguments that calls the correct function based on the parameter
 parseArgs :: [String] -> IO () 
 parseArgs args 
-    | (length args) < 2 = do
-        putStrLn "Too few arguments!" 
-        Exit.exitWith (Exit.ExitFailure 1)
+    -- only 1 arg - act upon which one it was
+    | (length args) == 1 = do
+        input <- getContents -- read stdin
+        actOnParameter args input
+        Exit.exitWith Exit.ExitSuccess
+    -- 2 arguments should be the parameter and the file from which to read
     | (length args) == 2 = do
-        putStrLn "Opening file!" 
+        fileHandle <- I.openFile (args !! 1) I.ReadMode
+        input <- I.hGetContents fileHandle
+        actOnParameter args input
+        I.hClose fileHandle
         Exit.exitWith Exit.ExitSuccess
+    -- otherwise I expect the input to be incorrect and in order to help the user, I show him the help menu
     | otherwise = do
-        let res1 = testParse ( unwords (args) )
-        print(res1)
-        Exit.exitWith Exit.ExitSuccess
+        printHelp
+        putStrLn "\nToo many or too few arguments!"
+        Exit.exitWith (Exit.ExitFailure 1)
 
--- main function to do IO stuff
+-- main function to call the other functions
 main :: IO ()
-main =  do
+main = do
         args <- E.getArgs
-        print(args)
         parseArgs args
-
--- function to parse the Point structure
--- ^\s*Point\s*{\s*x\s*:\s*([0-9]|[A-F])+\s*,\s*y\s*:\s*([0-9]|[A-F])+\s*}
-parsePoint :: Str.Parser Types.Point
-parsePoint = do
-    _ <- P.string "Point" -- has to start w/ "Point"
-    _ <- P.spaces
-    _ <- P.char '{'
-    _ <- P.spaces
-    x <- hexParse "x" -- x value
-    _ <- P.spaces
-    _ <- P.char ','
-    _ <- P.spaces
-    y <- hexParse "y" -- y value
-    _ <- P.spaces
-    _ <- P.char '}'
-    return (Types.Point x y) -- call a constructor using the 2
-
--- function to read a value that contains a hex number
--- ^val\s*:\s*([0-9]|[A-F])+
-hexParse :: String -> Str.Parser String
-hexParse valName = do
-    _ <- P.string valName --first, find the correct value
-    _ <- P.spaces -- dont care about number of spaces
-    _ <- P.char ':' -- there has to be a ':' somewhere
-    _ <- P.spaces
-    givenVal <- P.many1 (P.hexDigit) -- read while the char is a valid hex value
-    return givenVal

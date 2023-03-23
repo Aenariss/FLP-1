@@ -1,0 +1,22 @@
+#!/bin/bash
+#supposed to be run from the root folder as `./tests/tests-launch`
+
+tmpfile="./tests/tmp"
+inputCurve="./tests/exampleInput"
+inputCurve2="./tests/exampleInput2"
+
+./flp22-fun -i < $inputCurve > $tmpfile
+diffres=$(diff $tmpfile $inputCurve)
+rm $tmpfile
+if [ "$diffres" == "" ]; then
+    echo "Parameter -i works correctly - Test 1"
+fi
+
+./flp22-fun -i < $inputCurve2 > $tmpfile
+diffres=$(diff $tmpfile $inputCurve2)
+rm $tmpfile
+if [ "$diffres" == "" ]; then
+    echo "Parameter -i works correctly - Test 2"
+else
+    echo "$diffres"
+fi
