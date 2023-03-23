@@ -19,7 +19,7 @@ data Curve = Curve
 
 -- format the show instance to match the expected output
 instance Show Curve where
-    show (Curve q w e r t u) = "Curve {\n" ++ "p: "++ (Printf.printf "0x%X" q) ++ "\na: " ++ show w ++ "\nb: " ++ show e ++ "\ng: " ++ show r ++ "\nn: " ++ (Printf.printf "0x%X" t) ++ "\nh: " ++ show u ++ "\n}"
+    show (Curve q1 w1 e1 r1 t1 u1) = "Curve {\n" ++ "p: "++ (Printf.printf "0x%X" q1) ++ "\na: " ++ show w1 ++ "\nb: " ++ show e1 ++ "\ng: " ++ show r1 ++ "\nn: " ++ (Printf.printf "0x%X" t1) ++ "\nh: " ++ show u1 ++ "\n}"
 
 -- Point type definition
 data Point = Point 
@@ -29,8 +29,17 @@ data Point = Point
 
 -- format the show to match the expected
 instance Show Point where
-    show (Point q w) = "Point {\n    x: " ++ (Printf.printf "0x%X" q) ++ "\n    y: " ++ (Printf.printf "0x%X" w) ++ "\n}"
+    show (Point x1 y1) = "Point {\n    x: " ++ (Printf.printf "0x%X" x1) ++ "\n    y: " ++ (Printf.printf "0x%X" y1) ++ "\n}"
 
 -- Might be useful for points to be comparable, cant compile just w/ deriving Eq
 instance Eq Point where
-    (Point q w) == (Point u i) = q == u && w == i
+    (Point x1 y1) == (Point x2 y2) = x1 == x2 && y1 == y2
+
+data Key = Key 
+    { d :: Integer
+    , q :: Integer
+    } deriving (Eq)
+
+instance Show Key where
+    show (Key private public) = "Key {\n    d: " ++ (Printf.printf "0x%x" private) ++ "\n    Q: " ++ (Printf.printf "0x%x" public) ++ "\n}"
+
