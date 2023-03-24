@@ -37,9 +37,9 @@ instance Eq Point where
 
 data Key = Key 
     { d :: Integer
-    , q :: Integer
+    , q :: String
     } deriving (Eq)
 
 instance Show Key where
-    show (Key private public) = "Key {\n    d: " ++ (Printf.printf "0x%x" private) ++ "\n    Q: " ++ (Printf.printf "0x%x" public) ++ "\n}"
+    show (Key private public) = "Key {\n    d: " ++ (Printf.printf "0x%x" private) ++ "\n    Q: " ++ id public ++ "\n}"
 

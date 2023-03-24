@@ -5,12 +5,15 @@ Author: Vojtech Fiala <xfiala61>
 -}
 
 import qualified Types
+import qualified Data.Char as D
 import qualified ParseStructures as PS
 import qualified System.IO as I
 import qualified System.Environment as E
 import qualified System.Exit as Exit
 import qualified Text.Parsec as P
 import qualified System.Random as Random
+
+import Debug.Trace
 
 
 -- function to get the `b` from Right b
@@ -38,50 +41,88 @@ getRandomInInterval top =
     fst(Random.uniformR(1 :: Integer, (top-1) :: Integer) gen)
     where gen = Random.mkStdGen 42
 
--- function to convert integer to its binary representation in a string
+-- function to convert integer to its binary representation in a string and reverse it
 binary :: Integer -> String
-binary 0 = "0"
-binary 1 = "1"
-binary x = binary (x `div` 2) ++ show (x `mod` 2)
+binary x = reverse (binaryHelp x)
+    where 
+        binaryHelp 0 = "0" 
+        binaryHelp 1 = "1"
+        binaryHelp a = binaryHelp (a `div` 2) ++ show (a `mod` 2)
 
 -- https://en.wikipedia.org/wiki/Elliptic_curve_point_multiplication#Double-and-add
 -- function to calculate point multiplicatiojn using double and add algo
-doubleAndAdd :: Types.Point -> Types.Point -> Integer -> String -> Types.Point
-doubleAndAdd (Types.Point tempx tempy) (Types.Point resx resy) a privateStr
-    | privateStr == "" = Types.Point resx resy
-    | otherwise = if head privateStr == '1' then doubleAndAdd newTemp newRes a newStr else doubleAndAdd newTemp (Types.Point resx resy) a newStr
-    where newTemp = pointAdd (Types.Point tempx tempy) (Types.Point tempx tempy) a
-          newRes = pointAdd (Types.Point resx resy) (Types.Point tempx tempy) a
+
+doubleAndAdd :: Types.Point -> Types.Point -> Integer -> Integer -> String -> Types.Point
+doubleAndAdd tmpPoint resultPoint a p privateStr
+    | privateStr == "" = resultPoint
+    | otherwise = if head privateStr == '1' then doubleAndAdd newTemp newRes a p newStr else doubleAndAdd newTemp resultPoint a p newStr
+    where newTemp = pointAdd tmpPoint tmpPoint a p
+          newRes = pointAdd resultPoint tmpPoint a p
           newStr = tail privateStr
 
--- function to calculate the public key
--- TADY VYRESIT TEN FUCKED UP ZPICENY FORMAT nejak s x a y
-getPublic :: Types.Point -> Integer
-getPublic (Types.Point x y) = x
+{- -- version with folder, looks better but doesnt work (perhaps fix later?)
+doubleAndAdd :: Types.Point -> Types.Point -> Integer -> Integer -> String -> Types.Point
+doubleAndAdd tmpPoint resultPoint a p privateStr =
+  snd(foldr f (tmpPoint, resultPoint) privateStr)
+  where
+        f :: Char -> (Types.Point, Types.Point) -> (Types.Point, Types.Point)
+        f '1' (tmpPoint, resultPoint) = ((pointAdd tmpPoint tmpPoint a p), (pointAdd resultPoint tmpPoint a p))
+        f '0' (tmpPoint, resultPoint) = ((pointAdd tmpPoint tmpPoint a p), resultPoint)
+-}
 
-mDiff :: Integer -> Integer -> Integer -> Integer -> Integer
-mDiff xp yp xq yq = ((yq - yp) `div` (xq - xp))
-
-mSame :: Integer -> Integer -> Integer -> Integer
-mSame xp a yp = ((3*xp^2 + a) `div` (2*yp))
+-- function to simulate python-like pow(x,y,z)
+-- https://www.reddit.com/r/haskell/comments/mqtk6/comment/c33n70a/?utm_source=share&utm_medium=web2x&context=3
+-- incredibly more effective than x^y % p
+fastPow :: Integer -> Integer -> Integer -> Integer
+fastPow base exp modulo = fastpow' (base `mod` modulo) exp modulo 1
+    where fastpow' b 0 m r = r
+          fastpow' b e m r = fastpow' (b * b `mod` m) (e `div` 2) m (if even e then r else (r * b `mod` m))
 
 -- https://en.wikipedia.org/wiki/Elliptic_curve_point_multiplication
 -- function to add 2 points
-pointAdd :: Types.Point -> Types.Point -> Integer -> Types.Point
-pointAdd (Types.Point xp yp) (Types.Point xq yq) a
-    | (xp == xq && yq == yp) = Types.Point xr1 (m1*(xp-xr1)-yp)
-    | otherwise = Types.Point xr2 (m2*(xp-xr2)-yp)
-    where m1 = mSame xp a yp
-          xr1 = m1^2 - xp - xq
-          m2 = mDiff xp yp xq yq
-          xr2 = m2^2 - xp - xq
+pointAdd :: Types.Point -> Types.Point -> Integer -> Integer -> Types.Point
+pointAdd (Types.Point xp yp) (Types.Point xq yq) a p
+    | xp == 0 && yp == 0 = Types.Point xq yq
+    | xq == 0 && yq == 0 = Types.Point xp yp
+    | (xp == xq && yq == yp) = if yp == 0 then Types.Point 0 0 else Types.Point xr1 ((m1*(xp-xr1)-yp) `mod` p)
+    | xp == xq = Types.Point 0 0
+    | otherwise = Types.Point xr2 ((m2*(xp-xr2)-yp) `mod` p)
+    where m1 = mSame xp a yp p
+          xr1 = (m1^(2::Integer) - xp - xq) `mod` p
+          m2 = mDiff xp yp xq yq p
+          xr2 = (m2^(2::Integer) - xp - xq) `mod` p
+
+mDiff :: Integer -> Integer -> Integer -> Integer -> Integer -> Integer
+mDiff xp yp xq yq p = (((yq - yp) * (fastPow (xq - xp) (p-2) p)) `mod` p)
+
+mSame :: Integer -> Integer -> Integer -> Integer -> Integer
+mSame xp a yp p = (((3*xp*xp + a) * (fastPow (2*yp) (p-2) p)) `mod` p)
+
+-- function to convert an integer to its byte representation, aka 1024 = 0x0400
+-- https://www.tutorialspoint.com/haskell-program-to-convert-decimal-to-hexadecimal
+decToHex :: Integer -> String
+decToHex 0 = "0"
+decToHex n = reverse (hexChars n)
+   where
+      hexChars :: Integer -> String
+      hexChars 0 = ""
+      hexChars x = D.intToDigit (fromInteger (x `mod` 16)) : hexChars (x `div` 16)
 
 -- function to calculate private & public key pair from given eliptic Curve
 calculateKey :: Types.Curve -> Types.Key
-calculateKey (Types.Curve p a b g n h) =
+calculateKey (Types.Curve p a _ g n _) =
     Types.Key randomPrivate public
-    where randomPrivate = getRandomInInterval (n-1)
-          public = getPublic(doubleAndAdd g (Types.Point 0 0) a (binary randomPrivate))
+    where randomPrivate = 0xc9dcda39c4d7ab9d854484dbed2963da9c0cf3c6e9333528b4422ef00dd0b28e--getRandomInInterval (n-1)
+          public = getPublic(doubleAndAdd g (Types.Point 0 0) a p (binary randomPrivate))
+
+-- function to create the public key from the given X and Y coords
+getPublic :: Types.Point -> String
+getPublic (Types.Point x y) 
+    | (y > 0) = if length(decX ++ decY) `mod` 2 == 1 then "0x04" ++ "0" ++ decX ++ decY else "0x04" ++ decX ++ decY
+    | otherwise = if length(decX ++ decToHex(-y)) `mod` 2 == 1 then "0x04" ++ "0" ++ decX ++ decToHex(-y) else "0x04" ++ decX ++ decToHex(-y)
+    where decY = decToHex (y)
+          decX = decToHex (x)
+
 
 -- function to do get the appropriate output depending on the given argument
 actOnParameter :: [String] -> String -> IO ()

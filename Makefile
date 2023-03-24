@@ -1,13 +1,6 @@
-CC = ghc
-TARGET = flp22-fun
-CFLAGS = --make -Wall
+SRCDIR = ./src
 
-.PHONY: all clean
+.PHONY: all
 
 all:
-	$(CC) $(CFLAGS) $(TARGET).hs -o $(TARGET)
-	$(MAKE) clean
-
-clean:
-	rm ./*.hi
-	rm ./*.o
+	$(MAKE) -C $(SRCDIR) all
