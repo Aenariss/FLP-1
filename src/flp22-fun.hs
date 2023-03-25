@@ -12,7 +12,7 @@ import qualified System.Exit as Exit
 import qualified Text.Parsec as P
 import qualified System.Random as Random
 
---import Debug.Trace
+import Debug.Trace
 
 
 -- function to get the `b` from Right b
@@ -34,12 +34,12 @@ printHelp = do
     putStrLn "      -h prints this menu"
 
 -- function to generate 'random' nubmer in range 1-Top
--- because of Haskell and its weird IO stuff, this will keep producing the same number because I cant do anything else
-getRandomInInterval :: Integer -> Integer
-getRandomInInterval top =
-    fst(Random.uniformR(1, (top-1)) gen)
-    where 
-        gen = Random.mkStdGen 42
+getRandomInInterval :: Types.Curve -> IO Integer
+getRandomInInterval (Types.Curve _ _ _ _ n _) = Random.randomRIO(1, (n-1))
+
+-- same as above but for Sstruct
+getRandomInIntervalS :: Types.Sstruct -> IO Integer
+getRandomInIntervalS (Types.Sstruct (Types.Curve _ _ _ _ n _) _ _) = Random.randomRIO(1, (n-1))
 
 -- function to convert integer to its binary representation in a string and reverse it
 binary :: Integer -> String
@@ -114,31 +114,32 @@ decToHex x = hexHelp x
         hexHelp n = hexHelp (n `div` 16) ++ hexHelp (n `mod` 16)
 
 -- function to calculate private & public key pair from given eliptic Curve
-calculateKey :: Types.Curve -> Types.Key
-calculateKey (Types.Curve p a _ g n _) =
-    Types.Key randomPrivate public
-    where 
-        randomPrivate = getRandomInInterval (n-1) -- "randomly" choose an integer in interval
-        public = getPublic(doubleAndAdd g (Types.Point 0 0) a p (binary randomPrivate))
+calculateKey :: Types.Curve -> Integer -> Types.Key
+calculateKey (Types.Curve p a _ g _ _) random =
+    Types.Key random public
+    where
+        public = getPublic(doubleAndAdd g (Types.Point 0 0) a p (binary random))
 
 -- function to create the public key from the given X and Y coords
 getPublic :: Types.Point -> String
 getPublic (Types.Point x y) 
     | (y > 0) = if length(decX ++ decY) `mod` 2 == 1 then "0x04" ++ "0" ++ decX ++ decY else "0x04" ++ decX ++ decY
-    | otherwise = if length(decX ++ decToHex(-y)) `mod` 2 == 1 then "0x04" ++ "0" ++ decX ++ decToHex(-y) else "0x04" ++ decX ++ decToHex(-y)
+    | otherwise = if length(decX ++ decToHex(-y)) `mod` 2 == 1 then "0x04" ++ "0" ++ decX ++ decToHex(-y) else "0x04" ++ decX ++ decToHex(-y) -- if Y is negative, make it positive
     where 
         decY = decToHex (y)
         decX = decToHex (x)
 
 -- function to calculate the X parameter in the signature
-getSignatureX :: Types.Curve -> Integer -> Integer
-getSignatureX (Types.Curve p a _ g n _) k = getX(doubleAndAdd g (Types.Point 0 0) a p (binary k))
+-- https://cs.wikipedia.org/wiki/Protokol_digit%C3%A1ln%C3%ADho_podpisu_s_vyu%C5%BEit%C3%ADm_eliptick%C3%BDch_k%C5%99ivek
+getSignatureR :: Types.Curve -> Integer -> Integer
+getSignatureR (Types.Curve p a _ g n _) k = getX(doubleAndAdd g (Types.Point 0 0) a p (binary k))
     where 
-        getX (Types.Point x y) = x `mod` n
+        getX (Types.Point x _) = x `mod` n
 
 -- function to calculate the X parameter in the signature
-getSignatureY :: Types.Curve -> Types.Key -> Types.Hash -> Integer -> Integer -> Integer
-getSignatureY (Types.Curve p a b g n h) (Types.Key priv pub) (Types.Hash hash) r k = 0
+-- https://cs.wikipedia.org/wiki/Protokol_digit%C3%A1ln%C3%ADho_podpisu_s_vyu%C5%BEit%C3%ADm_eliptick%C3%BDch_k%C5%99ivek
+getSignatureS :: Types.Curve -> Types.Key -> Types.Hash -> Integer -> Integer -> Integer
+getSignatureS (Types.Curve _ _ _ _ n _) (Types.Key priv _) (Types.Hash hash) r k = ((modularInverse k n) * (hash + r*priv)) `mod` n
 
 -- function to calculate modular multiplicartive inverse
 -- https://stackoverflow.com/questions/4798654/modular-multiplicative-inverse-function-in-python
@@ -156,22 +157,58 @@ egcd a b
     where (g, y, x) = egcd (b `mod` a) a
         
 -- function to calculate signature
-calculateSignature :: Types.Sstruct -> Types.Signature
-calculateSignature (Types.Sstruct (Types.Curve p a b g n h) key hash) =
+calculateSignature :: Types.Sstruct -> Integer -> Types.Signature
+calculateSignature (Types.Sstruct (Types.Curve p a b g n h) key hash) k =
     Types.Signature r s
     where 
-        k = getRandomInInterval (n-1)
-        r = getSignatureX (Types.Curve p a b g n h) k
-        s = getSignatureY (Types.Curve p a b g n h) key hash r (modularInverse k n)
+        r = getSignatureR (Types.Curve p a b g n h) k
+        s = getSignatureS (Types.Curve p a b g n h) key hash r k
 
+-- function to create a point with x and y coords from pubkey
+getPoint :: String -> Types.Point 
+getPoint a = splitKey pureKey
+    where 
+        pureKey = drop 4 a -- remove 0x04
+
+-- function to split the pubkey into 2 coords
+splitKey :: String -> Types.Point
+splitKey a = Types.Point x y -- i count on the pubkey being 128 chars long
+    where
+        x = read("0x" ++ take 64 a) -- take first 64 values and prepend 0x so that it reads correct
+        y = read("0x" ++ drop 64 a)
+
+
+isValidPub :: Types.Point -> Types.Curve -> Bool
+isValidPub point (Types.Curve p a _ _ n _) = (doubleAndAdd point (Types.Point 0 0) a p (binary n) == (Types.Point 0 0))
+
+-- function to verify the signature
+-- as always, I assume the format is correct
+verifySignature :: Types.Vstruct -> Bool
+verifySignature (Types.Vstruct (Types.Curve p a b g n h) (Types.Signature r s) pubkey (Types.Hash hash)) 
+    | validity == False = False
+    | otherwise = ((getX point) == r)
+    where 
+        pubPoint = getPoint pubkey
+        validity = isValidPub pubPoint (Types.Curve p a b g n h)
+        getX (Types.Point x _) = x
+        w = modularInverse s n 
+        u1 = w*hash `mod` n
+        u2 = w*r `mod` n
+        point = (pointAdd(doubleAndAdd g (Types.Point 0 0) a p (binary u1)) (doubleAndAdd pubPoint (Types.Point 0 0) a p (binary u2)) a p)
 
 -- function to do get the appropriate output depending on the given argument
 actOnParameter :: [String] -> String -> IO ()
 actOnParameter args input
     | arg == "-i" = print (rightPart (P.parse PS.parseCurve "" input)) -- call the instance of Show of the Curve class and output it
-    | arg == "-k" = print (calculateKey (rightPart(P.parse PS.parseCurve "" input)))
-    | arg == "-s" = print (calculateSignature (rightPart(P.parse PS.parseSstruct "" input)))
-    | arg == "-v" = putStrLn "-v"
+    | arg == "-k" = do
+        let res = rightPart(P.parse PS.parseCurve "" input)
+        random <- getRandomInInterval res -- get a random number, must be from inside IO block
+        print (calculateKey res random)
+    | arg == "-s" = do
+        let res = rightPart(P.parse PS.parseSstruct "" input)
+        random <- getRandomInIntervalS res
+        print(calculateSignature res random)
+    | arg == "-v" = print (verifySignature(rightPart(P.parse PS.parseVstruct "" input)))
     | arg == "-h" = printHelp
     | otherwise = do
         printHelp

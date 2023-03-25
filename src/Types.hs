@@ -67,3 +67,13 @@ data Sstruct = Sstruct
 
 instance Show Sstruct where
     show (Sstruct cS kS hS) = show cS ++ "\n" ++ show kS ++ "\n" ++ show hS
+
+data Vstruct = Vstruct 
+    { c'''' :: Curve
+    , s'''' :: Signature
+    , pkey' :: String
+    , h'''' :: Hash
+    }
+
+instance Show Vstruct where
+    show (Vstruct cur sig pkey hhash) = show cur ++ "\n" ++ show sig ++ "\n" ++ "PublicKey {\nQ: " ++ id pkey ++ "\n}" ++ "\n" ++ show hhash

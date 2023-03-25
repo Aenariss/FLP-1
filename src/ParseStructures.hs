@@ -117,3 +117,41 @@ parseSstruct = do
     _ <- P.spaces
     hash <- parseHash
     return (Types.Sstruct curve key hash)
+
+parseSignature :: Str.Parser Types.Signature
+parseSignature = do
+    _ <- P.spaces
+    _ <- P.string "Signature"
+    _ <- P.spaces
+    _ <- P.char '{'
+    _ <- P.spaces
+    r <- parseHex "r"
+    _ <- P.spaces
+    s <- parseHex "s"
+    _ <- P.spaces
+    _ <- P.char '}'
+    return (Types.Signature (read(r)) (read(s)) )
+
+parsePkey :: Str.Parser String
+parsePkey = do
+    _ <- P.spaces
+    _ <- P.string "PublicKey"
+    _ <- P.spaces
+    _ <- P.char '{'
+    _ <- P.spaces
+    q <- parseHex "Q"
+    _ <- P.spaces
+    _ <- P.char '}'
+    return (q)
+
+parseVstruct :: Str.Parser Types.Vstruct
+parseVstruct = do
+    _ <- P.spaces
+    curve <- parseCurve
+    _ <- P.spaces
+    sig <- parseSignature
+    _ <- P.spaces
+    pkey <- parsePkey
+    _ <- P.spaces
+    hash <- parseHash
+    return (Types.Vstruct curve sig pkey hash)
