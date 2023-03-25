@@ -13,13 +13,13 @@ import qualified System.Exit as Exit
 import qualified Text.Parsec as P
 import qualified System.Random as Random
 
-import Debug.Trace
+--import Debug.Trace
 
 
 -- function to get the `b` from Right b
 rightPart :: Either a b -> b
 rightPart (Right b) = b
-rightPart (Left _) = error "There was an error in parsing the Curve!"
+rightPart (Left _) = error "There was an error in parsing the Input!"
 
 -- function to print Help
 printHelp :: IO ()
@@ -44,23 +44,23 @@ getRandomInInterval top =
 -- function to convert integer to its binary representation in a string and reverse it
 binary :: Integer -> String
 binary x = reverse (binaryHelp x)
-    where 
-        binaryHelp 0 = "0" 
-        binaryHelp 1 = "1"
-        binaryHelp a = binaryHelp (a `div` 2) ++ show (a `mod` 2)
+    where binaryHelp 0 = "0" 
+          binaryHelp 1 = "1"
+          binaryHelp a = binaryHelp (a `div` 2) ++ show (a `mod` 2)
 
 -- https://en.wikipedia.org/wiki/Elliptic_curve_point_multiplication#Double-and-add
--- function to calculate point multiplicatiojn using double and add algo
-
+-- function to calculate point multiplication using double and add algo
 doubleAndAdd :: Types.Point -> Types.Point -> Integer -> Integer -> String -> Types.Point
 doubleAndAdd tmpPoint resultPoint a p privateStr
     | privateStr == "" = resultPoint
-    | otherwise = if head privateStr == '1' then doubleAndAdd newTemp newRes a p newStr else doubleAndAdd newTemp resultPoint a p newStr
+    | otherwise = if head privateStr == '1' 
+                    then doubleAndAdd newTemp newRes a p newStr 
+                    else doubleAndAdd newTemp resultPoint a p newStr
     where newTemp = pointAdd tmpPoint tmpPoint a p
           newRes = pointAdd resultPoint tmpPoint a p
           newStr = tail privateStr
 
-{- -- version with folder, looks better but doesnt work (perhaps fix later?)
+{- -- version with foldr, looks better but doesnt work (perhaps fix later?)
 doubleAndAdd :: Types.Point -> Types.Point -> Integer -> Integer -> String -> Types.Point
 doubleAndAdd tmpPoint resultPoint a p privateStr =
   snd(foldr f (tmpPoint, resultPoint) privateStr)
@@ -74,8 +74,8 @@ doubleAndAdd tmpPoint resultPoint a p privateStr =
 -- https://www.reddit.com/r/haskell/comments/mqtk6/comment/c33n70a/?utm_source=share&utm_medium=web2x&context=3
 -- incredibly more effective than x^y % p
 fastPow :: Integer -> Integer -> Integer -> Integer
-fastPow base exp modulo = fastpow' (base `mod` modulo) exp modulo 1
-    where fastpow' b 0 m r = r
+fastPow base exp' modulo = fastpow' (base `mod` modulo) exp' modulo 1
+    where fastpow' _ 0 _ r = r
           fastpow' b e m r = fastpow' (b * b `mod` m) (e `div` 2) m (if even e then r else (r * b `mod` m))
 
 -- https://en.wikipedia.org/wiki/Elliptic_curve_point_multiplication
@@ -112,7 +112,7 @@ decToHex n = reverse (hexChars n)
 calculateKey :: Types.Curve -> Types.Key
 calculateKey (Types.Curve p a _ g n _) =
     Types.Key randomPrivate public
-    where randomPrivate = 0xc9dcda39c4d7ab9d854484dbed2963da9c0cf3c6e9333528b4422ef00dd0b28e--getRandomInInterval (n-1)
+    where randomPrivate = getRandomInInterval (n-1)
           public = getPublic(doubleAndAdd g (Types.Point 0 0) a p (binary randomPrivate))
 
 -- function to create the public key from the given X and Y coords
@@ -123,13 +123,44 @@ getPublic (Types.Point x y)
     where decY = decToHex (y)
           decX = decToHex (x)
 
+-- function to calculate the X parameter in the signature
+getSignatureX :: Types.Curve -> Integer -> Integer
+getSignatureX (Types.Curve p a _ g n _) k = getX(doubleAndAdd g (Types.Point 0 0) a p (binary k))
+        where getX (Types.Point x y) = x `mod` n
+
+-- function to calculate the X parameter in the signature
+getSignatureY :: Types.Curve -> Types.Key -> Types.Hash -> Integer -> Integer -> Integer
+getSignatureY (Types.Curve p a b g n h) (Types.Key priv pub) (Types.Hash hash) r k = 0
+
+-- function to calculate modularInverse
+-- python code which was linked on the forum doesnot understand that k^-1 doesnt m,ean 1/k ion this case but multiplicate inverse of k
+-- shamelessly taken from https://byorgey.wordpress.com/2020/02/15/competitive-programming-in-haskell-modular-arithmetic-part-1/
+modularInverse :: Integer -> Integer -> Integer
+modularInverse x y = z `mod` x
+        where (_,_,z) = egcd y x
+
+-- shamelessly taken from https://byorgey.wordpress.com/2020/02/15/competitive-programming-in-haskell-modular-arithmetic-part-1/
+egcd :: Integer -> Integer -> (Integer, Integer, Integer)
+egcd a 0 = (abs a, signum a, 0)
+egcd a b = (g, y, x - (a `div` b) * y)
+    where
+        (g,x,y) = egcd b (a `mod` b)
+
+-- function to calculate signature
+calculateSignature :: Types.Sstruct -> Types.Signature
+calculateSignature (Types.Sstruct (Types.Curve p a b g n h) key hash) =
+    Types.Signature r s
+    where k = getRandomInInterval (n-1)
+          r = getSignatureX (Types.Curve p a b g n h) k
+          s = getSignatureY (Types.Curve p a b g n h) key hash r (modularInverse k n)
+
 
 -- function to do get the appropriate output depending on the given argument
 actOnParameter :: [String] -> String -> IO ()
 actOnParameter args input
-    | arg == "-i" = print (rightPart(P.parse PS.parseCurve "" input)) -- call the instance of Show of the Curve class and output it
+    | arg == "-i" = print (rightPart (P.parse PS.parseCurve "" input)) -- call the instance of Show of the Curve class and output it
     | arg == "-k" = print (calculateKey (rightPart(P.parse PS.parseCurve "" input)))
-    | arg == "-s" =  putStrLn "-s"
+    | arg == "-s" = print (calculateSignature (rightPart(P.parse PS.parseSstruct "" input)))
     | arg == "-v" = putStrLn "-v"
     | arg == "-h" = printHelp
     | otherwise = do

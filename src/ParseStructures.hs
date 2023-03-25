@@ -14,6 +14,7 @@ import qualified Types
 -- ^\s*Curve\s*{\s* parseHex(p) \s* parseInt(a) \s* parseInt(b) \s* parsePoint() \s* parseHex(n) \s* parseInt(h)}
 parseCurve :: Str.Parser Types.Curve
 parseCurve = do
+    _ <- P.spaces
     _ <- P.string "Curve"
     _ <- P.spaces
     _ <- P.char '{'
@@ -37,6 +38,7 @@ parseCurve = do
 -- ^\s*Point\s*{\s*x\s*:\s*([0-9]|[A-F])+\s*\s*y\s*:\s*([0-9]|[A-F])+\s*}
 parsePoint :: String -> Str.Parser Types.Point
 parsePoint valName = do
+    _ <- P.spaces
     _ <- P.string valName --first, find the correct value
     _ <- P.spaces -- dont care about number of spaces
     _ <- P.char ':' -- there has to be a ':' somewhere
@@ -56,6 +58,7 @@ parsePoint valName = do
 -- ^val\s*:\s*([0-9]|[A-F])+
 parseHex :: String -> Str.Parser String
 parseHex valName = do
+    _ <- P.spaces
     _ <- P.string valName --first, find the correct value
     _ <- P.spaces -- dont care about number of spaces
     _ <- P.char ':' -- there has to be a ':' somewhere
@@ -68,9 +71,49 @@ parseHex valName = do
 -- ^val\s*:\s*([0-9])+
 parseInt :: String -> Str.Parser String
 parseInt valName = do
+    _ <- P.spaces
     _ <- P.string valName --first, find the correct value
     _ <- P.spaces -- dont care about number of spaces
     _ <- P.char ':' -- there has to be a ':' somewhere
     _ <- P.spaces
     givenVal <- P.many1 (P.digit) -- read while the char is a valid hex value
     return givenVal
+
+-- function to parse a key, similar to Point
+parseKey :: Str.Parser Types.Key
+parseKey = do
+    _ <- P.spaces
+    _ <- P.string "Key"
+    _ <- P.spaces
+    _ <- P.char '{'
+    _ <- P.spaces
+    d <- parseHex "d"
+    _ <- P.spaces
+    q <- parseHex "Q"
+    _ <- P.spaces
+    _ <- P.char '}'
+    return (Types.Key (read(d)) q)
+
+-- function to parse a hash
+parseHash :: Str.Parser Types.Hash
+parseHash = do
+    _ <- P.spaces
+    _ <- P.string "Hash"
+    _ <- P.spaces
+    _ <- P.char ':'
+    _ <- P.spaces
+    _ <- P.string "0x"
+    givenVal <- P.many1 (P.hexDigit)
+    return (Types.Hash (read("0x" ++ givenVal)))
+
+
+-- funciton to parse curve, key and hash
+parseSstruct :: Str.Parser Types.Sstruct
+parseSstruct = do
+    _ <- P.spaces
+    curve <- parseCurve
+    _ <- P.spaces
+    key <- parseKey
+    _ <- P.spaces
+    hash <- parseHash
+    return (Types.Sstruct curve key hash)

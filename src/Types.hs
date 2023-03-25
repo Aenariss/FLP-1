@@ -41,5 +41,29 @@ data Key = Key
     } deriving (Eq)
 
 instance Show Key where
-    show (Key private public) = "Key {\n    d: " ++ (Printf.printf "0x%x" private) ++ "\n    Q: " ++ id public ++ "\n}"
+    show (Key private public) = "Key {\nd: " ++ (Printf.printf "0x%x" private) ++ "\nQ: " ++ id public ++ "\n}"
 
+data Hash = Hash 
+    { h' :: Integer 
+    } deriving (Eq)
+
+instance Show Hash where
+    show (Hash hash) = "Hash: " ++ (Printf.printf "0x%x" hash)
+
+
+data Signature = Signature 
+    { r :: Integer
+    , s :: Integer
+    } deriving (Eq)
+
+instance Show Signature where
+    show (Signature r'' s'') = "Signature {\nr: " ++ (Printf.printf "0x%x" r'') ++ "\ns: " ++ (Printf.printf "0x%x" s'') ++ "\n}"
+
+data Sstruct = Sstruct 
+    { c''' :: Curve
+    , k''' :: Key
+    , h''' :: Hash
+    }
+
+instance Show Sstruct where
+    show (Sstruct cS kS hS) = show cS ++ "\n" ++ show kS ++ "\n" ++ show hS
