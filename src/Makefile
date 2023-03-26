@@ -1,3 +1,6 @@
+# MAKEFILE for FLP Project 1 2023
+# Author: Vojtech Fiala
+
 CC = ghc
 TARGET = flp22-fun
 CFLAGS = --make -Wall
@@ -6,7 +9,7 @@ CFLAGS = --make -Wall
 
 all:
 	$(CC) $(CFLAGS) $(TARGET).hs -o ../$(TARGET);
-	$(MAKE) clean;
+# $(MAKE) clean;
 
 clean:
 	rm ./*.hi
