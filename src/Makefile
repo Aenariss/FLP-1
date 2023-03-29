@@ -9,7 +9,7 @@ CFLAGS = --make -Wall
 
 all:
 	$(CC) $(CFLAGS) $(TARGET).hs -o ../$(TARGET);
-# $(MAKE) clean;
+	$(MAKE) clean;
 
 clean:
 	rm ./*.hi

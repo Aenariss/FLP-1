@@ -58,7 +58,7 @@ pointAdd (Types.Point xp yp) (Types.Point xq yq) a p
     | xp == xq = Types.Point 0 0
     | otherwise = Types.Point xr2 ((m2*(xp-xr2)-yp) `mod` p)
     where 
-        m1 = ((3*xp*xp + a) * (pow (2*yp) (p-2) p)) `mod` p
+        m1 = ((3*xp*xp + a) * (pow (2*yp) (p-2) p)) 
         xr1 = (m1^(2::Integer) - xp - xq) `mod` p
-        m2 = ((yq - yp) * (pow (xq - xp) (p-2) p)) `mod` p
+        m2 = ((yq - yp) * (pow (xq - xp) (p-2) p))
         xr2 = (m2^(2::Integer) - xp - xq) `mod` p

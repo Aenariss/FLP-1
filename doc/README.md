@@ -1,19 +1,18 @@
-## FLP Projekt 1 - ECDSA
-## 2023
-## Autor: Vojtech Fiala <xfiala61>
+## FLP 2023 Projekt 1 -- ECDSA 
+###  Autor: Vojtěch Fiala \<xfiala61\>
+## Obsah adresáře:
 
-### Obsah adresare:
+src/ - zdrojové soubory
+tests/ - soubory se vstupy, které jsou dále testovány jednoduchým shell a python skriptem
+doc/ - složká s dokumentací, kterou reprezentuje tento soubor
 
-src/ - zdrojove soubory
-tests/ - soubory se vstupy, ktere jsou dale testovany jednoduchym shell a python skriptem
-doc/ - slozka s dokumentaci obsahujici tento soubor
+Pro překlad je nutné v kořenovém adresáři použít **make**.
+Pro spuštění testů je možné použít **make test**, nejprve je ovšem nutné program přeložit příkazem make.
 
-Pro preklad je nutne v korenovem adresi pouzit **make**.
-Pro spusteni testu je mozne pouzit **make test**
+## Informace k řešení:
+Řešení předpokládá, že vstupy budou *KOREKTNÍ* a v jednotném formátu, konkrétně tom, jaký je uveden v zadání  -- tedy že např. u klíče na vstupu budou jeho části označeny vždy jako *d* a *Q* pro privátní, respektive veřejný klíč a hodnoty samotné budou taktéž validní.
 
-### Informace k reseni:
-Reseni predpoklada, ze vstupy budou KOREKTNI a v jednotnem formatu - tedy ze hodnoty napr. u klice budou na vstupu vzdy oznaceny jako d a Q pro privatni, respektive verejny a jejich hodnoty budou taktez validni.
-Ocekavany format vstupu vychazi ze zadani, konkretni vstupy, na kterych byla implementace testovana, se nachazeji ve slozce tests/
+V případě, že formát vstupu korektní není, tedy buď je úplně špatně a nebo v jiném než očekáváném formátu, program končí s chybou. Hodnoty program až na výjimky nekontroluje -- pokud ovšem budou v jiném formátu než je uveden v zadání (např. v desítkové soustavě namísto hexadecimální), dojde k chybě.
 
-
-V pripade neplatneho argumentu ci parametru -h se vypise napoveda.
+Konkrétní vstupy, na kterých byla implementace testována, se nacházejí ve složce tests/
+V případě zadání neplatného množství argumentů či neznámého argumentu, dojde k vypsání nápovědy, kterou je taktéž možné vypsat s parametrem *-h*.

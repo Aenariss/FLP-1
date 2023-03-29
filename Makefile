@@ -2,7 +2,7 @@
 # Author: Vojtech Fiala
 
 SRCDIR = ./src
-TESTFILE = tests/tests-launch
+TESTFILE = tests/tests-launch.sh
 
 .PHONY: all test pack
 
@@ -10,6 +10,7 @@ all:
 	$(MAKE) -C $(SRCDIR) all
 
 test:
+	$(MAKE) all
 	chmod +x ./$(TESTFILE)
 	./$(TESTFILE)
 
